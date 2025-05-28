@@ -1,4 +1,4 @@
-from core import mk_GeMMMapReduce, slicer, timer, check_equality
+from core import mk_GeMMMapReduce, slicer, timer, check
 from itertools import product
 import torch
 import torch.nn.functional as F
@@ -69,4 +69,4 @@ if __name__ == '__main__':
     inputs = X, P, Q
     mock = torch.randn(B, N)
 
-    check_equality(gemmmr_mlp, regular_mlp, inputs, mock)
+    check(gemmmr_mlp, regular_mlp, inputs, mock)

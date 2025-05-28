@@ -127,4 +127,12 @@ def check_speed(f1, inputs, mock, runs=10, warmup=3):
 
     return (time.perf_counter() - start) / runs
     
-
+def check(f1, f2, inputs, mock, runs=10, warmup=3):
+    check_equality(f1, f2, inputs, mock)
+    print(f'{" speed ":=^30}')
+    print(f' {" f1 ":-^26}  ')
+    s1 = check_speed(f1, inputs, mock, runs, warmup)
+    print(f' {s1:.2f}')
+    print(f' {" f2 ":-^26}  ')
+    s2 = check_speed(f2, inputs, mock, runs, warmup)
+    print(f' {s2:.2f}')

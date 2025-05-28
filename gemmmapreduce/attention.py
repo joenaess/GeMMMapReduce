@@ -1,4 +1,4 @@
-from core import mk_GeMMMapReduce, slicer, timer, check_equality, check_speed
+from core import mk_GeMMMapReduce, slicer, timer, check
 from itertools import product
 import torch
 
@@ -73,7 +73,7 @@ def regular_attention(q, k, v):
     return (q @ k.T).softmax(1) @ v
 
 if __name__ == '__main__':
-    M, N, D, F = 8*1024, 8*1024, 32, 32
+    M, N, D, F = 1024, 1024, 32, 32
 
     Q = torch.randn(M, F, requires_grad=True, dtype=torch.double)
     K = torch.randn(N, F, requires_grad=True, dtype=torch.double)
@@ -82,8 +82,6 @@ if __name__ == '__main__':
     inputs = Q, K, V
     mock = torch.randn(M, D)
 
-    check_equality(gemmmr_attention, regular_attention, inputs, mock)
-    print(f'gemmr   time: {check_speed(gemmmr_attention, inputs, mock):.3f}')
-    print(f'regular time: {check_speed(regular_attention, inputs, mock):.3f}')
+    check(gemmmr_attention, regular_attention, inputs, mock)
 
 
