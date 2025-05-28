@@ -42,7 +42,7 @@ results in an M-tensor of monoid values `A`, where `softmax(query, key.T, dim=1)
 
 The repo contains a factory function `mk_GeMMMapReduce` which takes functions `init`, `chunker`, `proj_fold`, 
 `proj_fold_bwd`, and `binary_reduce`, which performs the monoidal aggregation of results without realizing the full intermediate matrix needed
-to compute the aggregate, and a similar backwards pass.
+to compute the aggregate, and a similar backwards pass. As well as implementations for two-layer MLPs, Attention, XEntropy, Entropy, and Sampling.
 
 For more information read this paper ...
 
