@@ -67,4 +67,3 @@ if __name__ == '__main__':
     mock = torch.randn(M)
 
     check(gemmmr_entropy, regular_entropy, inputs, mock)
-
