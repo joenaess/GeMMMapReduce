@@ -5,13 +5,6 @@ import itertools
 import time
 from contextlib import contextmanager
 
-@contextmanager
-def timer(fmt='duration: {:.4f}'):
-    start = time.perf_counter()
-    yield
-    duration = time.perf_counter() - start
-    print(fmt.format(duration))
-
 def slicer(tot, chunk=1):
     start = 0
     while (start < tot):
@@ -92,24 +85,34 @@ def check_equality(f1, f2, inputs, mock):
     for p in inputs:
         if p.grad is not None:
             g2.append(p.grad.detach().clone())
+    
+    def check_pair(a, b):
+        delta = a - b
+        shapes_match = a.shape == b.shape
+        all_close = torch.allclose(a, b)
+        l2_diff = delta.pow(2).sum().sqrt()
+        max_diff = delta.abs().max()
+        print(f'{" shapes match": <20}: {shapes_match}')
+        print(f'{" all close": <20}: {all_close}')
+        print(f'{" l2 diff": <20}: {l2_diff}')
+        print(f'{" max_diff": <20}: {max_diff}')
+        print()
+        if all_close and shapes_match:
+            print('   All good! :)')
+        else:
+            print('   Something is wrong. :(')
+        print()
+
 
     print(f'{" output ":=^30}')
-    delta = (y1 - y2)
-    print(f'{" shapes match": <20}: {y1.shape == y2.shape}')
-    print(f'{" all close": <20}: {torch.allclose(y1, y2)}')
-    print(f'{" l2 diff": <20}: {delta.pow(2).sum().sqrt()}')
-    print(f'{" max_diff": <20}: {delta.abs().max()}')
+    check_pair(y1, y2)
 
 
     print(f'{" grad ":=^30}')
     for i, (a, b) in enumerate(zip(g1, g2)):
         name = f' grad_{i} '
         print(f'  {name:-^26}  ')
-        delta = a - b
-        print(f'{" shapes match": <20}: {a.shape == b.shape}')
-        print(f'{" all close": <20}: {torch.allclose(a, b)}')
-        print(f'{" l2 diff": <20}: {delta.pow(2).sum().sqrt()}')
-        print(f'{" max_diff": <20}: {delta.abs().max()}')
+        check_pair(a, b)
 
 
 def check_speed(f1, inputs, mock, runs=10, warmup=3):
@@ -136,3 +139,9 @@ def check(f1, f2, inputs, mock, runs=10, warmup=3):
     print(f' {" f2 ":-^26}  ')
     s2 = check_speed(f2, inputs, mock, runs, warmup)
     print(f' {s2:.2f}')
+    ratio = (s1 / s2)
+    print(f' relative time: {ratio:2f}')
+    if ratio > 1:
+        print(f'   f1 is slower :(')
+    else:
+        print(f'   f1 is faster :)')

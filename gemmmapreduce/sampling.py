@@ -1,4 +1,4 @@
-from core import mk_GeMMMapReduce, slicer, timer, check_equality
+from core import mk_GeMMMapReduce, slicer, check_equality
 from itertools import product
 import torch
 

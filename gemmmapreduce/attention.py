@@ -1,4 +1,4 @@
-from core import mk_GeMMMapReduce, slicer, timer, check
+from core import mk_GeMMMapReduce, slicer, check
 from itertools import product
 import torch
 
@@ -48,8 +48,8 @@ def chunker(query, key, value):
     assert (key.shape[0] == value.shape[0])
     M, F = query.shape
     N, D = value.shape
-    mslices = list(slicer(M, 2*128))
-    nslices = list(slicer(N, 2*128))
+    mslices = list(slicer(M, 256))
+    nslices = list(slicer(N, 256))
     for mslice, nslice in product(mslices, nslices):
         yield (
             lambda A: (A[0][mslice], A[1][mslice]),
