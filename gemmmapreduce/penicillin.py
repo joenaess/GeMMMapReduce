@@ -274,12 +274,13 @@ class XEntropyMax(torch.autograd.Function):
 
     @staticmethod
     def setup_context(ctx, inputs, outputs):
-        p, _, _ = outputs 
+        p, n, lpmax = outputs 
+        ctx.mark_non_differentiable(lpmax)
         ctx.save_for_backward(*inputs, p)
 
     @staticmethod
     @once_differentiable
-    def backward(ctx, g_a_p, g_a_n):
+    def backward(ctx, g_a_p, g_a_n, g_a_m):
         pred, trg, true, a_p = ctx.saved_tensors
         g_pred, g_trg = xentropy_bwd(pred, trg, true, a_p, g_a_p, g_a_n)
         return g_pred, g_trg, None
@@ -311,7 +312,11 @@ if __name__ == '__main__':
         trg *= D ** -.5
 
     true = torch.randint(N, (M,), device=device) % 2
+    inputs = pred, trg, true
+    mock = torch.randn(M, device=device, dtype=dtype)
     
     print('regular')
+    from core import check_equality
+    check_equality(lambda *x: xentropy_max(*x)[0], lambda *x: regular_xentropy_max(*x)[0], inputs, mock)
     print(xentropy_max(pred, trg, true))
     print(regular_xentropy_max(pred, trg, true))
