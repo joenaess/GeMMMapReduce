@@ -6,8 +6,6 @@ from triton.language.extra import libdevice
 from torch.autograd import Function
 from torch.autograd.function import once_differentiable
 
-logging.basicConfig(level=logging.DEBUG)
-
 @triton.jit
 def dot(a, b, acc=None, to_f32=False):
     if to_f32:
@@ -292,8 +290,14 @@ def xentropy_max(p, t, c):
         pmax = (lpmax - ap).exp()
     return (ap - an).to(p.dtype), pmax.to(p.dtype)
 
+def regular_xentropy_max(p, t, c):
+    logits = p @ t.T
+    xentropy = torch.nn.functional.cross_entropy(logits, c, reduction='none')
+    maxp = (logits.max(dim=1).values - logits.logsumexp(dim=1)).exp()
+    return xentropy, maxp
+
 if __name__ == '__main__':
-    M, N, D = 1024*16, 1024*16, 128
+    M, N, D = 1024+7, 1024+3, 128+1
     
     torch.manual_seed(0x5eed)
     device = 'cuda:0'
@@ -309,5 +313,5 @@ if __name__ == '__main__':
     true = torch.randint(N, (M,), device=device) % 2
     
     print('regular')
-    print(kernel_xentropy_max(pred, trg, true))
+    print(xentropy_max(pred, trg, true))
     print(regular_xentropy_max(pred, trg, true))
