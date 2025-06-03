@@ -48,8 +48,8 @@ def chunker(query, key, value):
     assert (key.shape[0] == value.shape[0])
     M, F = query.shape
     N, D = value.shape
-    mslices = list(slicer(M, 2*128))
-    nslices = list(slicer(N, 2*128))
+    mslices = list(slicer(M, 1024))
+    nslices = list(slicer(N, 1024))
     for mslice, nslice in product(mslices, nslices):
         yield (
             lambda A: (A[0][mslice], A[1][mslice]),
@@ -66,21 +66,23 @@ Attention = mk_GeMMMapReduce(
         binary_reduce=binary_reduce,
         )
 
+@torch.compile
 def gemmmr_attention(q, k, v):
     return Attention.apply(q, k, v)[1]
 
+@torch.compile
 def regular_attention(q, k, v):
     return (q @ k.T).softmax(1) @ v
 
 if __name__ == '__main__':
-    M, N, D, F = 8*1024, 8*1024, 32, 32
+    M, N, D, F = 16*1024, 16*1024, 128, 128
 
-    Q = torch.randn(M, F, requires_grad=True, dtype=torch.double)
-    K = torch.randn(N, F, requires_grad=True, dtype=torch.double)
-    V = torch.randn(N, D, requires_grad=True, dtype=torch.double)
+    Q = torch.randn(M, F, requires_grad=True, dtype=torch.double, device='cuda')
+    K = torch.randn(N, F, requires_grad=True, dtype=torch.double, device='cuda')
+    V = torch.randn(N, D, requires_grad=True, dtype=torch.double, device='cuda')
 
     inputs = Q, K, V
-    mock = torch.randn(M, D)
+    mock = torch.randn(M, D, device='cuda')
 
     check_equality(gemmmr_attention, regular_attention, inputs, mock)
     print(f'gemmr   time: {check_speed(gemmmr_attention, inputs, mock):.3f}')

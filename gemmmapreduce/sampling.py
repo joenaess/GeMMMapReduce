@@ -20,14 +20,14 @@ def proj_fold_bwd(pred, trg, tixs, a, g):
 
 def binary_reduce(a, b):
     # a: M
-    a_z, a_tz, a_c = a
-    b_z, b_tz, b_c = b
-    ab_z = torch.logaddexp(a_z, b_z)
-    ab_tz = torch.logaddexp(a_tz, b_tz)
-    sample = torch.rand(a_z.shape)
-    z = torch.where(sample < (a_z - ab_z).exp(), a_z, b_z)
-    c = torch.where(sample < (a_z - ab_z).exp(), a_c, b_c)
-    return z, ab_tz, c
+    a_cz, a_tz, a_c = a
+    b_cz, b_tz, b_c = b
+    z = torch.logaddexp(a_z, b_z)
+    tz = torch.logaddexp(a_tz, b_tz)
+    a_mask = torch.rand(a_z.shape) < (a_z - ab_z).exp()
+    cz = torch.where(a_mask, a_z, b_z)
+    c = torch.where(a_mask, a_c, b_c)
+    return cz, tz, c
 
 def init(pred, trg, tixs):
     assert (pred.shape[1] == trg.shape[1])
@@ -57,8 +57,8 @@ Sampler = mk_GeMMMapReduce(
         )
 
 def gemmmr_sampler(p, t):
-    z, tz, c = Sampler.apply(p, t, torch.arange(t.shape[0], dtype=torch.long))
-    return (z - tz).exp(), c
+    cz, tz, c = Sampler.apply(p, t, torch.arange(t.shape[0], dtype=torch.long))
+    return (cz - tz).exp(), c
 
 def regular_sampler(p, t):
     ps = (p @ t.T)

@@ -9,13 +9,3 @@ dependencies = [
   "numpy>=2.2.6",
   "torch>=2.7.0",
 ]
-
-[tool.uv.sources]
-torch = [
-    { index = "pytorch-cpu" },
-]
-
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
