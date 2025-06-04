@@ -73,7 +73,7 @@ XEntropy = mk_GeMMMapReduce(
         )
 
 def gemmmr_xentropy(p, t, c):
-    p, n = XEntropy.apply(p, t, c, torch.arange(t.shape[0]))
+    p, n = XEntropy.apply(p, t, c, torch.arange(t.shape[0], device=t.device))
     return p - n
 
 def regular_xentropy(p, t, c):
