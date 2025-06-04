@@ -72,16 +72,35 @@ def gemmmr_attention(q, k, v):
 def regular_attention(q, k, v):
     return (q @ k.T).softmax(1) @ v
 
+# will run on cpu by default...
+#if __name__ == '__main__':
+#    M, N, D, F = 1024, 1024, 32, 32
+#
+#    Q = torch.randn(M, F, requires_grad=True, dtype=torch.double)
+#    K = torch.randn(N, F, requires_grad=True, dtype=torch.double)
+#    V = torch.randn(N, D, requires_grad=True, dtype=torch.double)
+#
+#    inputs = Q, K, V
+#    mock = torch.randn(M, D)
+#
+#    check(gemmmr_attention, regular_attention, inputs, mock)
+
+# moving to GPUs below
 if __name__ == '__main__':
+    if torch.cuda.is_available():
+        device = torch.device("cuda") # Or "cuda:1" for the second GPU, or manage via CUDA_VISIBLE_DEVICES
+        print("Running on GPU:", torch.cuda.get_device_name(0))
+    else:
+        device = torch.device("cpu")
+        print("Running on CPU")
+
     M, N, D, F = 1024, 1024, 32, 32
 
-    Q = torch.randn(M, F, requires_grad=True, dtype=torch.double)
-    K = torch.randn(N, F, requires_grad=True, dtype=torch.double)
-    V = torch.randn(N, D, requires_grad=True, dtype=torch.double)
+    Q = torch.randn(M, F, requires_grad=True, dtype=torch.double, device=device)
+    K = torch.randn(N, F, requires_grad=True, dtype=torch.double, device=device)
+    V = torch.randn(N, D, requires_grad=True, dtype=torch.double, device=device)
 
     inputs = Q, K, V
-    mock = torch.randn(M, D)
+    mock = torch.randn(M, D, device=device) # Ensure mock tensor is also on the same device
 
     check(gemmmr_attention, regular_attention, inputs, mock)
-
-

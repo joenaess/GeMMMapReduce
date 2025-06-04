@@ -3,19 +3,13 @@ name = "gemmapreduce"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = "~=3.10"  # Changed to Python 3.10 compatibility
 dependencies = [
   "jupyter>=1.1.1",
   "numpy>=2.2.6",
-  "torch>=2.7.0",
+  "torch~=2.3.0",
+  "torchvision~=0.18.0", # Make sure these versions align with torch 2.3
+  "torchaudio~=2.3.0",
+  "markupsafe~=2.1.5",
 ]
 
-[tool.uv.sources]
-torch = [
-    { index = "pytorch-cpu" },
-]
-
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
