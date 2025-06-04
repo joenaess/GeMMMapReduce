@@ -80,14 +80,21 @@ def regular_xentropy(p, t, c):
     return torch.nn.functional.cross_entropy(p @ t.T, c, reduction='none')
 
 if __name__ == '__main__':
+    if torch.cuda.is_available():
+        device = torch.device("cuda:0") # Or "cuda:1" for the second GPU, or manage via CUDA_VISIBLE_DEVICES
+        print("Running on GPU:", torch.cuda.get_device_name(0))
+    else:
+        device = torch.device("cpu")
+        print("Running on CPU")
+
     M, N, D = 1024, 1024, 128
 
-    pred = torch.randn(M, D, requires_grad=True, dtype=torch.double)
-    trg = torch.randn(N, D, requires_grad=True, dtype=torch.double)
-    true = torch.randint(N, (M,))
+    pred = torch.randn(M, D, requires_grad=True, dtype=torch.double, device=device)
+    trg = torch.randn(N, D, requires_grad=True, dtype=torch.double, device=device)
+    true = torch.randint(N, (M,), device=device)
 
     inputs = pred, trg, true
-    mock = torch.randn(M)
+    mock = torch.randn(M, device=device)
 
     check(gemmmr_xentropy, regular_xentropy, inputs, mock)
 

@@ -59,14 +59,33 @@ def gemmmr_mlp(x, p, q):
 def regular_mlp(x, p, q):
     return F.relu(x @ p) @ q
 
+# if __name__ == '__main__':
+#     B, M, N, K = 1024, 1024, 1024, 1024
+
+#     X = torch.randn(B, M, requires_grad=True, dtype=torch.double)
+#     P = torch.randn(M, K, requires_grad=True, dtype=torch.double)
+#     Q = torch.randn(K, N, requires_grad=True, dtype=torch.double)
+
+#     inputs = X, P, Q
+#     mock = torch.randn(B, N)
+
+#     check(gemmmr_mlp, regular_mlp, inputs, mock)
+
 if __name__ == '__main__':
+    if torch.cuda.is_available():
+        device = torch.device("cuda:0") # Or "cuda:1" for the second GPU, or manage via CUDA_VISIBLE_DEVICES
+        print("Running on GPU:", torch.cuda.get_device_name(0))
+    else:
+        device = torch.device("cpu")
+        print("Running on CPU")
+
     B, M, N, K = 1024, 1024, 1024, 1024
 
-    X = torch.randn(B, M, requires_grad=True, dtype=torch.double)
-    P = torch.randn(M, K, requires_grad=True, dtype=torch.double)
-    Q = torch.randn(K, N, requires_grad=True, dtype=torch.double)
+    X = torch.randn(B, M, requires_grad=True, dtype=torch.double, device=device)
+    P = torch.randn(M, K, requires_grad=True, dtype=torch.double, device=device)
+    Q = torch.randn(K, N, requires_grad=True, dtype=torch.double, device=device)
 
     inputs = X, P, Q
-    mock = torch.randn(B, N)
+    mock = torch.randn(B, N, device=device) # Ensure mock tensor is also on the same device
 
     check(gemmmr_mlp, regular_mlp, inputs, mock)
