@@ -1,4 +1,4 @@
-from core import mk_GeMMMapReduce, slicer, check
+from .core import mk_GeMMMapReduce, slicer, check
 from itertools import product
 import torch
 

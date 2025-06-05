@@ -3,26 +3,26 @@ from torch.utils.cpp_extension import BuildExtension, CppExtension # Or CUDAExte
 
 setup(
     name='gemmmapreduce_cpp_extensions', # Updated package name for clarity
-    version='0.1.1', # Incremented version
+    version='0.1.2', # Incremented version
     author='Amaru and Jonas', # Optional
     author_email='jonas.lind@ai.se', # Optional
     description='A C++ extension for GeMMMapReduce with a ReLU-MatMul operation adn stuff for Amaru implemenations.', # Optional
-
     packages=find_packages(where='.', include=['gemmmapreduce*']),
     ext_modules=[
         CppExtension(
-            name='relu_matmul_cpp_lib', # Keep the old one if still needed
+            name='relu_matmul_cpp_lib', 
             sources=['cpp_src/relu_matmul.cpp'],
         ),
-        CppExtension( # NEW: Add an extension for custom attention
-            name='custom_attention_cpp_lib', # Name of the compiled .so for attention
-            sources=['cpp_src/custom_attention.cpp'],
+        CppExtension( 
+            name='custom_attention_cpp_lib', 
+            sources=['cpp_src/custom_attention.cpp'], # Assuming this is direct attention
         ),
-        # If you were to write custom CUDA kernels in .cu files for attention, check Jonas to learn how to use CUDAExtension:
-        # CUDAExtension(
-        #     name='custom_attention_cuda_lib',
-        #     sources=['cpp_src/custom_attention_wrapper.cpp', 'cpp_src/custom_attention_kernel.cu']
-        # )
+        CppExtension( # NEW: For the C++ GeMMMapReduce Attention
+            name='gemm_map_reduce_attention_lib', 
+            sources=['cpp_src/gemm_map_reduce_attention.cpp'], 
+            # If attention_utils.h is used by gemm_map_reduce_attention.cpp and not just a struct def,
+            # ensure compiler can find it (usually fine if in same dir or add include_dirs)
+        ),
     ],
     cmdclass={
         'build_ext': BuildExtension

@@ -12,3 +12,4 @@ wheels/
 # Project files
 *.log
 *.so
+test.py
