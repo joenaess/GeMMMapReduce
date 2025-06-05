@@ -1,4 +1,11 @@
 # GeMMMapReduce
+*Additions in Jonas' fork for GPU and cuda and c++
+To build c++ stuff
+```
+python setup.py build_ext --inplace
+```
+
+---------------------------------------------
 
 This repo is a Proof of Concept of a general framework to construct and generalize 
 memory efficient layers in neural networks. The idea is the same as Map Reduce, 
