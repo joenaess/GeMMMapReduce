@@ -11,7 +11,6 @@ setup(
     description='A C++ extension for GeMMMapReduce with a ReLU-MatMul operation and stuff for Amaru implemenations. Now with .cu', # Optional
     packages=find_packages(where='.', include=['gemmmapreduce*']),
     ext_modules=[
-        # ... other CppExtensions if any ...
         CUDAExtension( 
             name='gemm_map_reduce_attention_lib', # Can keep the same library name
             sources=[

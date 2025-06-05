@@ -5,6 +5,16 @@
 #include <limits>   
 #include <algorithm> // For std::min
 
+// In gemm_map_reduce_attention.cpp
+// Declaration of the function from custom_proj_fold_kernel.cu
+void proj_fold_cuda_dispatcher(
+    const torch::Tensor& query_chunk,
+    const torch::Tensor& key_chunk,
+    const torch::Tensor& value_chunk,
+    torch::Tensor& log_weights_out,    // Output tensor
+    torch::Tensor& weighted_values_out // Output tensor
+);
+
 // Corresponds to init() in attention.py
 AttentionMonoid init_attention_accumulator_cpp(const torch::Tensor& query, const torch::Tensor& value) {
     // query: Full M x F tensor (used for shape and device)
@@ -112,19 +122,30 @@ std::tuple<torch::Tensor, torch::Tensor> gemm_map_reduce_attention_forward_cpp(
             int64_t n_end = std::min(n_start + kv_chunk_size, N_full);
             
             // Define key_chunk and value_chunk here
-            torch::Tensor key_chunk = K_full.slice(/*dim=*/0, n_start, n_end);
+            torch::Tensor key_chunk = K_full.slice(/*dim=*/0, n_start, n_end);            
             torch::Tensor value_chunk = V_full.slice(/*dim=*/0, n_start, n_end);
 
-            // This is where line 103, 107, 109/111 errors were likely occurring.
-            // If you had lines here trying to call a custom kernel or pre-allocate its output,
-            // remove them for now and use the ATen-based proj_fold.
+            // --- This section changes ---
+            // 1. Pre-allocate output tensors for the custom CUDA kernel for proj_fold
+            //    Ensure to use the c10::IntArrayRef fix if directly using torch::empty with {}
+            auto M_chunk_size = query_chunk.size(0);
+            auto D_val_dim = V_full.size(1);
+            auto common_options = query_chunk.options(); // Get dtype, device
 
-            AttentionMonoid local_projection = proj_fold_attention_cpp(
-                query_chunk, // From outer loop
-                key_chunk,   // Defined in this inner loop
-                value_chunk  // Defined in this inner loop
+            // For log_weights (shape: M_chunk)
+            torch::Tensor local_proj_log_weights = torch::empty(c10::IntArrayRef({M_chunk_size}), common_options);
+
+            // For weighted_values (shape: M_chunk x D_val_dim)
+            torch::Tensor local_proj_weighted_values = torch::empty(c10::IntArrayRef({M_chunk_size, D_val_dim}), common_options);
+
+            // 2. Call the dispatcher for your custom CUDA kernel
+            proj_fold_cuda_dispatcher(
+                query_chunk, key_chunk, value_chunk,
+                local_proj_log_weights, local_proj_weighted_values
             );
-            
+
+            AttentionMonoid local_projection(local_proj_log_weights, local_proj_weighted_values);
+
             current_acc_for_m_slice = binary_reduce_attention_cpp(current_acc_for_m_slice, local_projection);
         }
         
