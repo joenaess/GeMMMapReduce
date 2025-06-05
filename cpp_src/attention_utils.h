@@ -14,3 +14,12 @@ struct AttentionMonoid {
     AttentionMonoid(torch::Tensor lw, torch::Tensor wv)
         : log_weights(lw), weighted_values(wv) {}
 };
+
+// addition for AttentionMonoid in .cu
+void launch_proj_fold_fused_kernel(
+    const torch::Tensor& query_chunk, 
+    const torch::Tensor& key_chunk, 
+    const torch::Tensor& value_chunk,
+    torch::Tensor& log_weights_out,
+    torch::Tensor& weighted_values_out
+);

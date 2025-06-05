@@ -1,7 +1,9 @@
 // cpp_src/gemm_map_reduce_attention.cpp
-#include "attention_utils.h" // created a header...
+#include "attention_utils.h" 
 #include <vector>
-#include <iostream> // For debugging, remove later J
+#include <iostream> 
+#include <limits>   
+#include <algorithm> // For std::min
 
 // Corresponds to init() in attention.py
 AttentionMonoid init_attention_accumulator_cpp(const torch::Tensor& query, const torch::Tensor& value) {
@@ -98,41 +100,41 @@ std::tuple<torch::Tensor, torch::Tensor> gemm_map_reduce_attention_forward_cpp(
         int64_t m_end = std::min(m_start + query_chunk_size, M_full);
         torch::Tensor query_chunk = Q_full.slice(/*dim=*/0, m_start, m_end);
 
-        // Get views/slices of the global accumulator for the current query_chunk
-        // These represent the 'a' that gets updated in the Python loop: a = aslice(A)
-        // We need to handle these carefully. The binary_reduce updates these iteratively.
-        torch::Tensor A_global_log_weights_slice = A_global.log_weights.slice(/*dim=*/0, m_start, m_end);
-        torch::Tensor A_global_weighted_values_slice = A_global.weighted_values.slice(/*dim=*/0, m_start, m_end);
+        torch::Tensor A_global_log_weights_slice_view = A_global.log_weights.slice(/*dim=*/0, m_start, m_end);
+        torch::Tensor A_global_weighted_values_slice_view = A_global.weighted_values.slice(/*dim=*/0, m_start, m_end);
         
-        // Current accumulator state for this m_slice. We copy for iterative updates.
         AttentionMonoid current_acc_for_m_slice(
-            A_global_log_weights_slice.clone(), // Clone because binary_reduce expects values and we update in loop
-            A_global_weighted_values_slice.clone()
+            A_global_log_weights_slice_view.clone(), // Clone for iterative update within n_loop
+            A_global_weighted_values_slice_view.clone()
         );
 
-        // Loop over key/value chunks (nslices)
         for (int64_t n_start = 0; n_start < N_full; n_start += kv_chunk_size) {
             int64_t n_end = std::min(n_start + kv_chunk_size, N_full);
+            
+            // Define key_chunk and value_chunk here
             torch::Tensor key_chunk = K_full.slice(/*dim=*/0, n_start, n_end);
             torch::Tensor value_chunk = V_full.slice(/*dim=*/0, n_start, n_end);
 
-            // Compute local projection for Q_chunk and KV_chunk
-            AttentionMonoid local_projection = proj_fold_attention_cpp(query_chunk, key_chunk, value_chunk);
+            // This is where line 103, 107, 109/111 errors were likely occurring.
+            // If you had lines here trying to call a custom kernel or pre-allocate its output,
+            // remove them for now and use the ATen-based proj_fold.
+
+            AttentionMonoid local_projection = proj_fold_attention_cpp(
+                query_chunk, // From outer loop
+                key_chunk,   // Defined in this inner loop
+                value_chunk  // Defined in this inner loop
+            );
             
-            // Reduce with the current accumulator for this m_slice
             current_acc_for_m_slice = binary_reduce_attention_cpp(current_acc_for_m_slice, local_projection);
         }
         
-        // After all n_chunks are processed for the current m_chunk,
-        // copy the final accumulated state back to the global accumulator slices.
-        A_global_log_weights_slice.copy_(current_acc_for_m_slice.log_weights);
-        A_global_weighted_values_slice.copy_(current_acc_for_m_slice.weighted_values);
+        A_global_log_weights_slice_view.copy_(current_acc_for_m_slice.log_weights);
+        A_global_weighted_values_slice_view.copy_(current_acc_for_m_slice.weighted_values);
     }
 
     return std::make_tuple(A_global.log_weights, A_global.weighted_values);
 }
 
-// Binding code
 TORCH_LIBRARY(gemm_map_reduce_attention_cpp_ops, m) {
     m.def("forward", gemm_map_reduce_attention_forward_cpp);
 }
