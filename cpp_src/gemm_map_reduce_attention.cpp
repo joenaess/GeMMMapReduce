@@ -21,15 +21,17 @@ AttentionMonoid init_attention_accumulator_cpp(const torch::Tensor& query, const
     // value: Full N x D tensor (used for shape and device)
     // M = query.size(0), F = query.size(1)
     // N = value.size(0), D = value.size(1)
-    // borde stämma...
-    
+    // borde stämma...    
+
     int64_t M = query.size(0);
     int64_t D_val = value.size(1); // Dimension of value vectors
 
-    auto options = query.options(); // Get dtype and device from query tensor
+    auto options_with_grad = query.options().requires_grad(true); 
 
-    torch::Tensor log_weights_acc = torch::full({M}, -std::numeric_limits<double>::infinity(), options);
-    torch::Tensor weighted_values_acc = torch::zeros({M, D_val}, options);
+    //auto options = query.options(); // Get dtype and device from query tensor
+
+    torch::Tensor log_weights_acc = torch::full({M}, -std::numeric_limits<double>::infinity(), options_with_grad);
+    torch::Tensor weighted_values_acc = torch::zeros({M, D_val}, options_with_grad);
 
     return AttentionMonoid(log_weights_acc, weighted_values_acc);
 }
@@ -101,51 +103,75 @@ std::tuple<torch::Tensor, torch::Tensor> gemm_map_reduce_attention_forward_cpp(
 
     int64_t M_full = Q_full.size(0);
     int64_t N_full = K_full.size(0);
+    int64_t D_val_dim = V_full.size(1);
+    auto common_options = Q_full.options(); // For creating new tensors with same dtype/device
 
-    // Initialize the global accumulator A
-    AttentionMonoid A_global = init_attention_accumulator_cpp(Q_full, V_full);
+    // --- MODIFICATION FOR DEBUGGING STEP 2 START ---
 
-    // Loop over query chunks (mslices)
-    for (int64_t m_start = 0; m_start < M_full; m_start += query_chunk_size) {
-        int64_t m_end = std::min(m_start + query_chunk_size, M_full);
+    // Create placeholder full-size output tensors for debugging purposes
+    torch::Tensor debug_final_log_weights = torch::zeros({M_full}, common_options);
+    torch::Tensor debug_final_weighted_values = torch::zeros({M_full, D_val_dim}, common_options);
+
+    // Process only the first m_chunk and first n_chunk (if tensors are not empty)
+    if (M_full > 0 && N_full > 0) {
+        int64_t m_start = 0;
+        int64_t m_end = std::min(query_chunk_size, M_full);
         torch::Tensor query_chunk = Q_full.slice(/*dim=*/0, m_start, m_end);
 
-        torch::Tensor A_global_log_weights_slice_view = A_global.log_weights.slice(/*dim=*/0, m_start, m_end);
-        torch::Tensor A_global_weighted_values_slice_view = A_global.weighted_values.slice(/*dim=*/0, m_start, m_end);
+        int64_t n_start = 0;
+        int64_t n_end = std::min(kv_chunk_size, N_full);
+        torch::Tensor key_chunk = K_full.slice(/*dim=*/0, n_start, n_end);
+        torch::Tensor value_chunk = V_full.slice(/*dim=*/0, n_start, n_end);
+
+        // Call your ATen-based proj_fold
+        AttentionMonoid local_projection = proj_fold_attention_cpp(
+            query_chunk, 
+            key_chunk,   
+            value_chunk  
+        );
+
+        // Copy the result of this first proj_fold into the corresponding slice 
+        // of our debug output tensors.
+        // The goal is to see if local_projection.weighted_values has a grad_fn
+        // and if that grad_fn propagates through the copy_ to debug_final_weighted_values.
+        if (local_projection.log_weights.defined() && local_projection.weighted_values.defined()) {
+            debug_final_log_weights.slice(0, m_start, m_end).copy_(local_projection.log_weights);
+            debug_final_weighted_values.slice(0, m_start, m_end).copy_(local_projection.weighted_values);
+        }
+    }
+    // Return these debug tensors. They have the correct output shape, but only the
+    // first chunk's (m_start to m_end) data is populated from proj_fold.
+    // The rest will be zeros (or whatever debug_final_... was initialized with).
+    return std::make_tuple(debug_final_log_weights, debug_final_weighted_values);
+
+    // --- Original code to be commented out for this debugging step: ---
+    /*
+    AttentionMonoid A_global = init_attention_accumulator_cpp(Q_full, V_full);
+
+    for (int64_t m_start = 0; m_start < M_full; m_start += query_chunk_size) {
+        int64_t m_end = std::min(m_start + query_chunk_size, M_full);
+        torch::Tensor query_chunk = Q_full.slice(0, m_start, m_end); // Already defined above for debug
+
+        torch::Tensor A_global_log_weights_slice_view = A_global.log_weights.slice(0, m_start, m_end);
+        torch::Tensor A_global_weighted_values_slice_view = A_global.weighted_values.slice(0, m_start, m_end);
         
         AttentionMonoid current_acc_for_m_slice(
-            A_global_log_weights_slice_view.clone(), // Clone for iterative update within n_loop
+            A_global_log_weights_slice_view.clone(),
             A_global_weighted_values_slice_view.clone()
         );
 
         for (int64_t n_start = 0; n_start < N_full; n_start += kv_chunk_size) {
             int64_t n_end = std::min(n_start + kv_chunk_size, N_full);
             
-            // Define key_chunk and value_chunk here
-            torch::Tensor key_chunk = K_full.slice(/*dim=*/0, n_start, n_end);            
-            torch::Tensor value_chunk = V_full.slice(/*dim=*/0, n_start, n_end);
+            torch::Tensor key_chunk = K_full.slice(0, n_start, n_end); // Already defined above for debug
+            torch::Tensor value_chunk = V_full.slice(0, n_start, n_end); // Already defined above for debug
 
-            // --- This section changes ---
-            // 1. Pre-allocate output tensors for the custom CUDA kernel for proj_fold
-            //    Ensure to use the c10::IntArrayRef fix if directly using torch::empty with {}
-            auto M_chunk_size = query_chunk.size(0);
-            auto D_val_dim = V_full.size(1);
-            auto common_options = query_chunk.options(); // Get dtype, device
-
-            // For log_weights (shape: M_chunk)
-            torch::Tensor local_proj_log_weights = torch::empty(c10::IntArrayRef({M_chunk_size}), common_options);
-
-            // For weighted_values (shape: M_chunk x D_val_dim)
-            torch::Tensor local_proj_weighted_values = torch::empty(c10::IntArrayRef({M_chunk_size, D_val_dim}), common_options);
-
-            // 2. Call the dispatcher for your custom CUDA kernel
-            proj_fold_cuda_dispatcher(
-                query_chunk, key_chunk, value_chunk,
-                local_proj_log_weights, local_proj_weighted_values
+            AttentionMonoid local_projection = proj_fold_attention_cpp(
+                query_chunk, 
+                key_chunk,   
+                value_chunk  
             );
-
-            AttentionMonoid local_projection(local_proj_log_weights, local_proj_weighted_values);
-
+            
             current_acc_for_m_slice = binary_reduce_attention_cpp(current_acc_for_m_slice, local_projection);
         }
         
@@ -154,6 +180,7 @@ std::tuple<torch::Tensor, torch::Tensor> gemm_map_reduce_attention_forward_cpp(
     }
 
     return std::make_tuple(A_global.log_weights, A_global.weighted_values);
+    */
 }
 
 TORCH_LIBRARY(gemm_map_reduce_attention_cpp_ops, m) {
