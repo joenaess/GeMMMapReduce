@@ -4,7 +4,7 @@
 #include <ATen/Dispatch.h> // For AT_DISPATCH_FLOATING_TYPES_AND_HALF etc.
 #include <ATen/cuda/CUDAContext.h> // For at::cuda::getCurrentCUDAStream()
 
-// Include your monoid definition if it's in a separate header and needed here
+// Include the monoid definition if it's in a separate header and needed here
 #include "attention_utils.h" // If AttentionMonoid struct is used directly by kernel outputs
 
 // ----------------------------------------------------------------------------
@@ -20,7 +20,7 @@ __global__ void proj_fold_fused_kernel_impl(
     int M_chunk, int N_chunk, int F_dim, int D_val_dim
     // ... other necessary dimensions, strides for query, key, value, and outputs
 ) {
-    // --- THIS IS WHERE YOUR ACTUAL CUSTOM FUSED CUDA KERNEL LOGIC WOULD GO ---
+    // --- THIS IS WHERE THE ACTUAL CUSTOM FUSED CUDA KERNEL LOGIC WOULD GO ---
     // This logic would implement the equivalent of:
     //   zs = query_chunk @ key_chunk.T
     //   z_local = torch.logsumexp(zs, dim=1)
@@ -86,7 +86,7 @@ void launch_proj_fold_fused_kernel_templated(
 
 // ----------------------------------------------------------------------------
 // Step 3: Dispatcher Function (Host Code)
-// This is what your main C++ code (gemm_map_reduce_attention.cpp) will call.
+// This is what the main C++ code (gemm_map_reduce_attention.cpp) will call.
 // It takes torch::Tensor, determines the dtype, and calls the typed templated launcher.
 // ----------------------------------------------------------------------------
 void proj_fold_cuda_dispatcher(
@@ -111,7 +111,7 @@ void proj_fold_cuda_dispatcher(
                 query_chunk.scalar_type() == weighted_values_out.scalar_type(),
                 "Input and output tensors must have the same dtype");
     
-    // Make tensors contiguous if your kernel expects that (very common)
+    // Make tensors contiguous if the kernel expects that (very common)
     // This creates copies if they are not already contiguous.
     // For performance, ensure inputs are already contiguous if possible before calling.
     auto query_c = query_chunk.contiguous();
